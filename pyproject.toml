@@ -1,0 +1,41 @@
+[project]
+name = "auto-browse"
+version = "0.0.2"
+description = "Playwright automation tests using AI"
+authors = [
+    { name = "Gurvinder Dhillon" }
+]
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "browser-use>=0.1.27",
+    "lxml-html-clean>=0.4.1",
+    "maincontentextractor>=0.0.4",
+    "pip>=24.3.1",
+    "playwright>=1.49.1",
+    "pydantic-ai>=0.0.18",
+    "pydantic-graph>=0.0.19",
+    "python-dotenv>=1.0.1",
+    "tld==0.13",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+    "pytest>=8.3.4",
+    "hatch>=1.13.0",
+    "build>=1.2.2",
+    "pytest-asyncio>=0.24.0"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
