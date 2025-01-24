@@ -2,6 +2,9 @@
 
 A Python package for AI-powered Test automation using Playwright.
 
+## Website and Documentation
+Coming soon! - https://auto-browse.com/
+
 ## Installation
 
 With pip:
