@@ -1,7 +1,7 @@
 [project]
 name = "auto-browse"
-version = "0.0.2"
-description = "Playwright automation tests using AI"
+version = "0.0.5"
+description = "Test Automation using AI Agents"
 authors = [
     { name = "Gurvinder Dhillon" }
 ]
