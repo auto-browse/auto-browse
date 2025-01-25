@@ -1,9 +1,10 @@
 # auto-browse
 
+Test Automation using AI Agents.
 A Python package for AI-powered Test automation using Playwright.
 
 ## Website and Documentation
-Coming soon! - https://auto-browse.com/
+  - https://auto-browse.com/
 
 ## Installation
 
@@ -26,6 +27,7 @@ ANTHROPIC_API_KEY=your_api_key_here
 
 Set the following environment variables:
 ```bash
+AUTOBROWSE_ANONYMIZED_TELEMETRY=true
 ANONYMIZED_TELEMETRY=false
 BROWSER_USE_LOGGING_LEVEL=info
 ```
