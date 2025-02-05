@@ -1,0 +1,48 @@
+[project]
+name = "browser-init"
+version = "0.1.0"
+description = "Browser initialization and context management for browser-use"
+authors = [
+    {name = "Gurvinder Dhillon", email = "gurvinder.dhillon@example.com"}
+]
+dependencies = [
+    "playwright>=1.40.0",
+    "pydantic>=2.0.0",
+    "typing-extensions>=4.0.0",
+    "loguru>=0.7.0",
+]
+requires-python = ">=3.9"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.dev-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+]
+lint = [
+    "ruff>=0.1.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
