@@ -5,8 +5,12 @@ from typing import Any
 from main_content_extractor import MainContentExtractor
 from browser_use.browser.browser import BrowserContext
 
-from browser_use.browser.browser import BrowserContext
-from browser_use.controller.views import (
+
+
+from browser_init.context import BrowserContext
+
+from auto_browse.browser.views import (
+    ActionResult,
     SearchGoogleAction,
     GoToUrlAction,
     ClickElementAction,
@@ -18,8 +22,6 @@ from browser_use.controller.views import (
     ScrollAction,
     SendKeysAction
 )
-from browser_use.agent.views import ( ActionResult)
-
 
 logger = logging.getLogger(__name__)
 

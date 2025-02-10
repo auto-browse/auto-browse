@@ -13,7 +13,6 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "browser-use>=0.1.27",
     "lxml-html-clean>=0.4.1",
     "maincontentextractor>=0.0.4",
     "pip>=24.3.1",

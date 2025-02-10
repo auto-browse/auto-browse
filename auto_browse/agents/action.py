@@ -4,15 +4,8 @@ import logging
 
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.test import TestModel
-
-from auto_browse.dependencies.common_dependencies import AgentDeps
-from auto_browse.tools.browser_actions import (
-    search_google, go_to_url, click_element, input_text, switch_tab,
-    open_tab, extract_content, scroll_down, scroll_up, send_keys,
-    scroll_to_text, get_dropdown_options, select_dropdown_option, go_back, done
-)
-
-from browser_use.controller.views import (
+from auto_browse.browser.views import (
+    ActionResult,
     ClickElementAction,
     DoneAction,
     ExtractPageContentAction,
@@ -22,9 +15,19 @@ from browser_use.controller.views import (
     ScrollAction,
     SearchGoogleAction,
     SendKeysAction,
-    SwitchTabAction,
+    SwitchTabAction
 )
-from browser_use.agent.views import (ActionResult)
+#from browser_init.context import BrowserContext
+#from browser_state.models import BrowserState
+
+from auto_browse.dependencies.common_dependencies import AgentDeps
+from auto_browse.tools.browser_actions import (
+    search_google, go_to_url, click_element, input_text, switch_tab,
+    open_tab, extract_content, scroll_down, scroll_up, send_keys,
+    scroll_to_text, get_dropdown_options, select_dropdown_option, go_back, done
+)
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +62,8 @@ async def browser_state_prompt(ctx: RunContext[AgentDeps]) -> str:
             'aria-expanded',
             'aria_name'
         ]
-    state = await ctx.deps.state
-    elements_text = state.element_tree.clickable_elements_to_string(include_attributes=attr)
+    state =  ctx.deps.state
+    elements_text = state.dom_tree.clickable_elements_to_string(include_attributes=attr)
     if elements_text != '':
         extra = '... Cut off - use extract content or scroll to get more ...'
         elements_text = f'{extra}\n{elements_text}\n{extra}'

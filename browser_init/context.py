@@ -7,13 +7,15 @@ import logging
 import os
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Optional, TypedDict
 
 from playwright.async_api import Browser as PlaywrightBrowser
 from playwright.async_api import BrowserContext as PlaywrightBrowserContext
 from playwright.async_api import Page
 
 from browser_init.views import BrowserError, URLNotAllowedError
+from browser_state.models import BrowserState
+from browser_capture.views import DOMElementNode, DOMState
 
 if TYPE_CHECKING:
     from browser_init.browser import Browser
@@ -86,6 +88,7 @@ class BrowserSession:
     """Browser session information"""
     context: PlaywrightBrowserContext
     current_page: Page
+    cached_state: Optional['BrowserState'] = None
 
 class BrowserContext:
     """Browser context management"""
@@ -158,11 +161,32 @@ class BrowserContext:
         context = await self._create_context(playwright_browser)
         page = await context.new_page()
 
+        # Initialize with empty state
+        from browser_state.manager import StateManager
+        state_manager = StateManager(page)
+        initial_state = await state_manager.capture_state()
+
         self.session = BrowserSession(
             context=context,
             current_page=page,
+            cached_state=initial_state
         )
         return self.session
+
+    async def get_state(self, use_vision: bool = False) -> BrowserState:
+        """Get the current state of the browser, updating the cache"""
+        page = await self.get_current_page()
+
+        # Create state manager and capture state
+        from browser_state.manager import StateManager
+        state_manager = StateManager(page)
+        new_state = await state_manager.capture_state(include_screenshot=use_vision)
+
+        # Update cached state in session
+        if self.session:
+            self.session.cached_state = new_state
+
+        return new_state
 
     async def get_session(self) -> BrowserSession:
         """Lazy initialization of the browser and related components"""
@@ -326,6 +350,41 @@ class BrowserContext:
         """Get the current page HTML content"""
         page = await self.get_current_page()
         return await page.content()
+
+    async def is_file_uploader(self, element_node: DOMElementNode) -> bool:
+        """Check if element is a file uploader input"""
+        return (
+            element_node.tag_name.lower() == "input"
+            and element_node.attributes.get("type", "").lower() == "file"
+        )
+
+    async def _click_element_node(self, element_node: DOMElementNode, wait_for_navigation: bool = True) -> None:
+        """Click an element and handle navigation"""
+        page = await self.get_current_page()
+        await page.click(f'[browser-user-highlight-id="playwright-highlight-{element_node.highlight_index}"]')
+        if wait_for_navigation:
+            await page.wait_for_load_state('networkidle', timeout=5000)
+
+    async def switch_to_tab(self, page_id: int) -> None:
+        """Switch to a specific tab by ID"""
+        session = await self.get_session()
+        if page_id >= len(session.context.pages):
+            raise Exception(f'Tab with id {page_id} does not exist')
+        session.current_page = session.context.pages[page_id]
+
+    async def _input_text_element_node(self, element_node: DOMElementNode, text: str) -> None:
+        """Input text into an element"""
+        page = await self.get_current_page()
+        selector = f'[browser-user-highlight-id="playwright-highlight-{element_node.highlight_index}"]'
+        await page.fill(selector, text)
+
+    async def create_new_tab(self, url: str) -> None:
+        """Create a new tab and navigate to URL"""
+        session = await self.get_session()
+        page = await session.context.new_page()
+        session.current_page = page
+        await page.goto(url)
+        await page.wait_for_load_state('networkidle', timeout=5000)
 
     async def execute_javascript(self, script: str):
         """Execute JavaScript code on the page"""
