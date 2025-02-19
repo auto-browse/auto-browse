@@ -69,6 +69,7 @@ class DomService:
             },
 
             isElementVisible(element) {
+                if (!element) return false;
                 const style = window.getComputedStyle(element);
                 const rect = element.getBoundingClientRect();
                 return (
@@ -94,8 +95,38 @@ class DomService:
                 );
             },
 
-            buildDomTree(node, highlightElements, focusHighlightIndex, viewportExpansion) {
+            processShadowRoot(shadowRoot, options) {
+                if (!shadowRoot) return [];
+
+                const children = [];
+                for (const child of shadowRoot.children) {
+                    const childData = this.buildDomTree(child, options);
+                    if (childData) children.push(childData);
+                }
+                return children;
+            },
+
+            processIframe(iframe, options) {
+                try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    if (!iframeDoc) return null;
+
+                    const children = [];
+                    for (const child of iframeDoc.body.children) {
+                        const childData = this.buildDomTree(child, options);
+                        if (childData) children.push(childData);
+                    }
+                    return children;
+                } catch (e) {
+                    console.warn('Failed to access iframe content:', e);
+                    return null;
+                }
+            },
+
+            buildDomTree(node, options) {
                 if (!node) return null;
+
+                const { highlightElements, focusElement, viewportExpansion } = options;
 
                 if (node.nodeName.toLowerCase() === "script" || node.nodeName.toLowerCase() === "style") {
                     return null;
@@ -122,10 +153,26 @@ class DomService:
                     right: window.innerWidth
                 };
 
-                if (!isVisible && !this.isInteractive(node)) return null;
-                if (rect.bottom < viewport.top || rect.top > viewport.bottom) return null;
+                // Check if this is a shadow host
+                const isShadowHost = !!node.shadowRoot;
+                console.log('Node check:', {
+                    nodeName: node.nodeName,
+                    id: node.id,
+                    isShadowHost,
+                    isVisible,
+                    isInteractive: this.isInteractive(node)
+                });
+
+                // Always include shadow hosts and interactive/visible elements
+                if (!isShadowHost && !isVisible && !this.isInteractive(node)) {
+                    console.log('Skipping node:', node.nodeName, node.id);
+                    return null;
+                }
+                if (!isShadowHost && rect.bottom < viewport.top || rect.top > viewport.bottom) return null;
 
                 const nodeData = {
+                    shadowRoot: isShadowHost,
+                    isTopLevel: isShadowHost, // Mark shadow hosts as top level
                     tagName: node.nodeName.toLowerCase(),
                     xpath: this.getXPath(node),
                     attributes: {},
@@ -139,18 +186,31 @@ class DomService:
                     nodeData.attributes[attr.name] = attr.value;
                 }
 
+                // Handle shadow DOM - mark host and process shadow content
                 if (node.shadowRoot) {
-                    nodeData.shadowRoot = true;
+                    nodeData.shadowRoot = true;  // Mark as shadow host
+                    const shadowChildren = this.processShadowRoot(node.shadowRoot, options);
+                    // Even if there are no shadow children, keep shadowRoot=true
+                    nodeData.children.push(...(shadowChildren || []));
                 }
 
+                // Handle iframes
+                if (node.nodeName.toLowerCase() === 'iframe') {
+                    const iframeChildren = this.processIframe(node, options);
+                    if (iframeChildren) {
+                        nodeData.children.push(...iframeChildren);
+                    }
+                }
+
+                // Process regular children
                 for (const child of node.childNodes) {
-                    const childData = this.buildDomTree(child, highlightElements, focusHighlightIndex, viewportExpansion);
+                    const childData = this.buildDomTree(child, options);
                     if (childData) nodeData.children.push(childData);
                 }
 
                 if (highlightElements && this.isInteractive(node)) {
                     nodeData.highlightIndex = this.highlightIndex++;
-                    if (nodeData.highlightIndex === focusHighlightIndex) {
+                    if (nodeData.highlightIndex === focusElement) {
                         nodeData.isTopElement = true;
                     }
 
@@ -175,9 +235,7 @@ class DomService:
 
                 return this.buildDomTree(
                     document.documentElement,
-                    options.highlightElements,
-                    options.focusElement,
-                    options.viewportExpansion
+                    options
                 );
             }
         };
@@ -205,17 +263,32 @@ class DomService:
     def _create_selector_map(self, element_tree: DOMElementNode) -> SelectorMap:
         """Create a map of selectors from the element tree"""
         selector_map = {}
+        next_index = max([0] + [node.highlight_index for node in self._get_all_nodes(element_tree)
+                              if isinstance(node, DOMElementNode) and node.highlight_index is not None]) + 1
 
-        def process_node(node: DOMBaseNode):
-            if isinstance(node, DOMElementNode) and node.highlight_index is not None:
-                selector_map[node.highlight_index] = node
-
+        def process_node(node: DOMBaseNode, next_idx: int) -> int:
             if isinstance(node, DOMElementNode):
-                for child in node.children:
-                    process_node(child)
+                if node.highlight_index is not None:
+                    selector_map[node.highlight_index] = node
+                # Always include shadow hosts
+                elif node.shadow_root:
+                    selector_map[next_idx] = node
+                    next_idx += 1
 
-        process_node(element_tree)
+                for child in node.children:
+                    next_idx = process_node(child, next_idx)
+            return next_idx
+
+        process_node(element_tree, next_index)
         return selector_map
+
+    def _get_all_nodes(self, node: DOMBaseNode) -> list[DOMBaseNode]:
+        """Helper to get all nodes in tree"""
+        nodes = [node]
+        if isinstance(node, DOMElementNode):
+            for child in node.children:
+                nodes.extend(self._get_all_nodes(child))
+        return nodes
 
     def _parse_node(
         self,

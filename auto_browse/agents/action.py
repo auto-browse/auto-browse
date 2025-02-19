@@ -44,6 +44,8 @@ async def core_instructions() -> str:
 		2. Plan a sequence of actions to accomplish the given task
 		3. Call the required tools to execute the actions
         4. You have access to current url, tabs, and interactive elements on the page to help you plan your actions
+        5. Before you call the tool, make sure to check the results of the previous tool call. If the task is already completed, you can call the 'done' tool to signal completion.
+        6. You can make max two tool calls in a single action. First tool call to take action and second tool call will be the done tool call. No more tool calls will be allowed after the done tool call.
 		"""
 
 @action.system_prompt

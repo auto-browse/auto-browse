@@ -1,127 +1,146 @@
 import logging
-from typing import Optional, List
+from dataclasses import dataclass
+from typing import Optional, Union, Literal
 
 from auto_browse.telemetry import log_event
 from browser_init.browser import Browser, BrowserConfig
 from browser_init.context import BrowserContext
-#from browser_capture.service import DomService
 from browser_state.manager import StateManager
-#from browser_state.models import BrowserState
 
+# Define known model names
+KnownModelName = Literal[
+    "openai:gpt-4o-mini",
+    "openai:gpt-4o",
+    "openai:gpt-4-turbo",
+    "openai:gpt-4",
+    "openai:o1-preview"
+]
 
 logger = logging.getLogger(__name__)
+
+@dataclass
+class AutoBrowseSession:
+    """Session container for AutoBrowse"""
+    context: BrowserContext
+    state_manager: StateManager
+    model: str
 
 class AutoBrowse:
     DEFAULT_MODEL = "openai:gpt-4o-mini"
 
-    def __init__(self, model: str, **kwargs):
-        browser_config = BrowserConfig(**kwargs)
-        self.browser = Browser(browser_config)
+    def __init__(self, model: Union[str, None] = None, browser: Optional[Browser] = None, **kwargs):
+        if browser is None:
+            browser_config = BrowserConfig(**kwargs)
+            self.browser = Browser(browser_config)
+        else:
+            self.browser = browser
         self.model = model if model is not None else self.DEFAULT_MODEL
-        self.context: Optional[BrowserContext] = None
-        #self.page = None
-        #self.dom_service = None
-        self.state_manager: Optional[StateManager] = None
+        self._session: Optional[AutoBrowseSession] = None
 
-    async def __aenter__(self):
-        """Async context manager entry"""
-        self.context = await self.browser.new_context()
-        # Initialize state manager with current page
-        page = await self.context.get_current_page()
-        self.state_manager = StateManager(page)
-        return self
+    async def get_session(self) -> AutoBrowseSession:
+        """Lazy initialization of browser session"""
+        if self._session is None:
+            context = await self.browser.new_context()
+            page = await context.get_current_page()
+            state_manager = StateManager(page)
+            self._session = AutoBrowseSession(
+                context=context,
+                state_manager=state_manager,
+                model=self.model
+            )
+        return self._session
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit"""
-        await self.browser.close()
-
-    # async def setup(self):
-    #     """Initialize browser context and services"""
-    #     if not self.context:
-    #         self.context = await self.browser.new_context()
-    #         self.page = await self.context.get_current_page()
-    #         self.dom_service = DomService(self.page)
-    #         self.state_manager = StateManager(self.page)
-
-    #         # Initialize selector map
-    #         dom_state = await self.dom_service.get_clickable_elements()
-    #         await self.context.get_session() # Ensure session exists
-    #         session = await self.context.get_session()
-    #         session.selector_map = dom_state.selector_map
-
-    async def setup(self):
-        """Explicit async setup that can be awaited directly."""
-        self.context = await self.browser.new_context()
-        page = await self.context.get_current_page()
-        self.state_manager = StateManager(page)
-        return self
-
-    async def teardown(self):
-        """Explicit async teardown that should be called after setup."""
-        await self.browser.close()
+    async def get_current_page(self):
+        """Get the current page from the session"""
+        session = await self.get_session()
+        return await session.context.get_current_page()
 
     async def get_state(self, use_vision=True):
         """Get current browser state"""
-        if self.context is None:
-            raise RuntimeError("Browser context not initialized. Use 'async with' pattern.")
-        page = await self.context.get_current_page()
-        self.state_manager = StateManager(page)  # Update state manager with current page
-        return await self.state_manager.capture_state(include_screenshot=use_vision)
-        #if not self.state_manager:
-        #    raise RuntimeError("Browser not initialized. Call setup() first.")
-        #return await self.state_manager.capture_state()
+        try:
+            session = await self.get_session()
+            if not session or not session.context:
+                raise RuntimeError("Failed to initialize browser session")
+
+            page = await session.context.get_current_page()
+            if not page:
+                raise RuntimeError("Failed to get current page")
+
+            session.state_manager = StateManager(page)  # Update state manager with current page
+            state = await session.state_manager.capture_state(include_screenshot=use_vision)
+            if not state:
+                raise RuntimeError("Failed to capture browser state")
+
+            return state
+        except Exception as e:
+            logger.error(f"Failed to get browser state: {e}")
+            raise RuntimeError(f"Failed to get browser state: {e}") from e
 
     async def ai(self, task: str):
         """Execute AI prompt"""
         from auto_browse.agents.action import action
         from auto_browse.dependencies.common_dependencies import AgentDeps
 
-        #if not self.context or not self.dom_service:
-        #    await self.setup()
-
-        #logger.info(f"Executing AI task at the context level: {task}")
-        #state = await self.get_state(use_vision=True)
-
-        # Update selector map before executing task
-        #if self.dom_service and self.context:
-        #    dom_state = await self.dom_service.get_clickable_elements()
-        #    session = await self.context.get_session()
-        #    session.selector_map = dom_state.selector_map
-
         logger.info(f"Executing AI task: {task}")
 
-        if self.context is None:
-            raise RuntimeError("Browser context not initialized. Use 'async with' pattern.")
+        try:
+            session = await self.get_session()
+            if not session or not session.context:
+                raise RuntimeError("Failed to initialize browser session")
 
-        # Get session to access cached state
-        #session = await self.context.get_session()
-        # Get current state using state manager
-        #current_state = await self.get_state(use_vision=False)
-        # Use the already cached state if it exists, otherwise get fresh state
-        #current_state = session.cached_state or await self.get_state(use_vision=False)
+            current_state = await self.get_state(use_vision=False)
+            if not current_state:
+                raise RuntimeError("Failed to get browser state")
 
-         # Always get fresh state with current DOM tree and selector map
-        current_state = await self.get_state(use_vision=False)
+            # Update cached state so tools use same state as AI
+            browser_session = await session.context.get_session()
+            if browser_session:
+                browser_session.cached_state = current_state
 
-        # Update cached state so tools use same state as AI
-        session = await self.context.get_session()
-        session.cached_state = current_state
-        deps = AgentDeps(max_actions_per_step=4, browser_context=self.context, state=current_state)
-        result = await action.run(task, deps=deps, model=self.model)
+            deps = AgentDeps(
+                max_actions_per_step=4,
+                browser_context=session.context,  # We've already checked session and context are not None
+                state=current_state
+            )
 
-        # Log AI method usage with simple success/fail status
-        log_event('ai_method_called', {
-            'status': 'fail' if result is None else 'success',
-            'model': self.model  # Log the model name string
-        })
+            # Cast model to KnownModelName since we know it's one of the valid values
+            result = await action.run(task, deps=deps, model=session.model)  # type: ignore
 
-        return result
+            # Log AI method usage with simple success/fail status
+            log_event('ai_method_called', {
+                'status': 'fail' if result is None else 'success',
+                'model': session.model
+            })
+
+            return result
+        except Exception as e:
+            logger.error(f"Failed to execute AI task: {e}")
+            raise RuntimeError(f"Failed to execute AI task: {e}") from e
 
     async def close(self):
         """Close browser and cleanup resources"""
+        if self._session:
+            await self._session.context.close()
+            self._session = None
         if self.browser:
             await self.browser.close()
-            self.context = None
-            self.page = None
-            self.dom_service = None
-            self.state_manager = None
+
+    # Maintain async context manager support for backward compatibility
+    async def __aenter__(self):
+        """Async context manager entry"""
+        await self.get_session()  # Ensure session is initialized
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit"""
+        await self.close()
+
+    # Maintain explicit setup/teardown for backward compatibility
+    async def setup(self):
+        """Explicit async setup that can be awaited directly."""
+        await self.get_session()  # Initialize session
+        return self
+
+    async def teardown(self):
+        """Explicit async teardown that should be called after setup."""
+        await self.close()
