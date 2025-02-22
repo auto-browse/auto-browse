@@ -363,7 +363,8 @@ class BrowserContext:
         page = await self.get_current_page()
         await page.click(f'[browser-user-highlight-id="playwright-highlight-{element_node.highlight_index}"]')
         if wait_for_navigation:
-            await page.wait_for_load_state('networkidle', timeout=5000)
+            #await page.wait_for_load_state('networkidle', timeout=5000)
+            await page.wait_for_load_state()
 
     async def switch_to_tab(self, page_id: int) -> None:
         """Switch to a specific tab by ID"""

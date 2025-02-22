@@ -3,8 +3,6 @@ import json
 import logging
 from typing import Any
 from main_content_extractor import MainContentExtractor
-from browser_use.browser.browser import BrowserContext
-
 
 
 from browser_init.context import BrowserContext
@@ -108,7 +106,7 @@ async def click_element(params: ClickElementAction, browser: BrowserContext):
 
     try:
         await browser._click_element_node(element_node)
-        msg = f'🖱️  Clicked button with index {params.index}: {element_node.get_all_text_till_next_clickable_element(max_depth=2)}'
+        msg = f'🖱️  Click action done. Clicked element with index {params.index}: {element_node.get_all_text_till_next_clickable_element(max_depth=2)}'
 
         logger.info(msg)
         logger.debug(f'Element xpath: {element_node.xpath}')

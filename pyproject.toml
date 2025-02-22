@@ -13,6 +13,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
+    "posthog>=3.7.0",
     "lxml-html-clean>=0.4.1",
     "maincontentextractor>=0.0.4",
     "pip>=24.3.1",

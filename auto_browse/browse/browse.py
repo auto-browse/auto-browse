@@ -4,17 +4,9 @@ from typing import Optional, Union, Literal
 
 from auto_browse.telemetry import log_event
 from browser_init.browser import Browser, BrowserConfig
-from browser_init.context import BrowserContext
+from browser_init.context import BrowserContext, BrowserContextConfig
 from browser_state.manager import StateManager
 
-# Define known model names
-KnownModelName = Literal[
-    "openai:gpt-4o-mini",
-    "openai:gpt-4o",
-    "openai:gpt-4-turbo",
-    "openai:gpt-4",
-    "openai:o1-preview"
-]
 
 logger = logging.getLogger(__name__)
 
@@ -28,19 +20,22 @@ class AutoBrowseSession:
 class AutoBrowse:
     DEFAULT_MODEL = "openai:gpt-4o-mini"
 
-    def __init__(self, model: Union[str, None] = None, browser: Optional[Browser] = None, **kwargs):
+    def __init__(self, model: Union[str, None] = None, browser: Optional[Browser] = None,
+                 new_context_config: Optional[BrowserContextConfig] = None, **kwargs):
         if browser is None:
             browser_config = BrowserConfig(**kwargs)
             self.browser = Browser(browser_config)
         else:
             self.browser = browser
         self.model = model if model is not None else self.DEFAULT_MODEL
+        self.new_context_config = new_context_config
         self._session: Optional[AutoBrowseSession] = None
 
     async def get_session(self) -> AutoBrowseSession:
         """Lazy initialization of browser session"""
         if self._session is None:
-            context = await self.browser.new_context()
+            config = self.new_context_config if self.new_context_config else BrowserContextConfig()
+            context = await self.browser.new_context(config)
             page = await context.get_current_page()
             state_manager = StateManager(page)
             self._session = AutoBrowseSession(
