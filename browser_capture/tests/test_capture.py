@@ -1,14 +1,17 @@
 import pytest
+import pytest_asyncio
 from playwright.async_api import async_playwright
 from browser_capture.service import DomService
 from browser_capture.views import DOMElementNode, DOMTextNode
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def page():
     async with async_playwright() as p:
         browser = await p.chromium.launch()
-        page = await browser.new_page()
+        context = await browser.new_context()
+        page = await context.new_page()
         yield page
+        await context.close()
         await browser.close()
 
 def verify_dom_node(node):

@@ -22,6 +22,11 @@ dependencies = [
     "pydantic-graph>=0.0.19",
     "python-dotenv>=1.0.1",
     "tld==0.13",
+    "loguru>=0.7.0",
+    "pillow>=10.0.0",
+    "beautifulsoup4>=4.9.0",
+    "pydantic>=2.0.0",
+    "typing-extensions>=4.0.0",
 ]
 
 [dependency-groups]
@@ -39,3 +44,6 @@ build-backend = "hatchling.build"
 
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
